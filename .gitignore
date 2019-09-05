@@ -2,7 +2,10 @@
 
 # dependencies
 /node_modules
+/.idea
 /.pnp
+package-lock.json
+.gitignore
 .pnp.js
 
 # testing
