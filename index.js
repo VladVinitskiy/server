@@ -1,5 +1,5 @@
 const express = require('express');
-const app = express();
+const index = express();
 const axios = require('axios');
 const bodyPareser = require('body-parser');
 const cors = require('cors');
@@ -13,11 +13,11 @@ let users = [
 let news = [];
 let session;
 
-app.use(bodyPareser.json());
-app.use(bodyPareser.urlencoded({extended: true}));
-app.use(cors());
+index.use(bodyPareser.json());
+index.use(bodyPareser.urlencoded({extended: true}));
+index.use(cors());
 
-app.get('/news', (req, res) => {
+index.get('/news', (req, res) => {
     axios.get(`https://newsapi.org/v2/top-headlines?sources=techcrunch&apiKey=${KEY}`)
         .then(response => {
             return response.data.articles
@@ -43,23 +43,23 @@ app.get('/news', (req, res) => {
         });
 });
 
-app.get('/users', (req, res) => {
+index.get('/users', (req, res) => {
     res.send(users);
 });
 
-app.post('/user', (req, res) => {
+index.post('/user', (req, res) => {
     users.push({...req.body});
     res.send(req.body);
     console.log(`SIGN UP ${req.body.name}`);
 });
 
-app.post('/news', (req, res) => {
+index.post('/news', (req, res) => {
     news.unshift({...req.body});
     res.send(req.body);
 });
 
 
-app.post('/login', (req, res) => {
+index.post('/login', (req, res) => {
     const {email, password} = req.body;
 
     users.map((user)=>{
@@ -73,7 +73,7 @@ app.post('/login', (req, res) => {
     });
 });
 
-app.get('/me',(req,res) => {
+index.get('/me',(req, res) => {
     if (session){
         res.send(session)
     } else {
@@ -81,7 +81,7 @@ app.get('/me',(req,res) => {
     }
 });
 
-app.get('/logout',(req,res) => {
+index.get('/logout',(req, res) => {
     if (session) {
         res.send("Error");
     }else {
@@ -91,7 +91,7 @@ app.get('/logout',(req,res) => {
 });
 
 
-app.put('/news/:index', (req, res) => {
+index.put('/news/:index', (req, res) => {
     news.map((article, index) => {
         if (index === +req.params.index.slice(1)) {
             return article.comments.push({
@@ -107,7 +107,7 @@ app.put('/news/:index', (req, res) => {
 
 
 //update data
-app.put('/users/:name', (req, res) => {
+index.put('/users/:name', (req, res) => {
     let user = users.find((user) => {
         return user.name === req.params.name
     });
@@ -119,7 +119,7 @@ app.put('/users/:name', (req, res) => {
 });
 
 //delete data
-app.delete('/users/:name', (req, res) => {
+index.delete('/users/:name', (req, res) => {
     users = users.filter((user) => {
         return user.name !== req.params.name;
     });
@@ -128,4 +128,4 @@ app.delete('/users/:name', (req, res) => {
 });
 
 
-app.listen(port, () => console.log(`listening on port ${port}`));
+index.listen(port, () => console.log(`listening on port ${port}`));
