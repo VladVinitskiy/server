@@ -4,7 +4,7 @@ const axios = require('axios');
 const bodyPareser = require('body-parser');
 const cors = require('cors');
 const KEY = '19c35e4ad3b54f4faae2dfc9b75ea8f7';
-const port = '5000';
+const port = process.env.PORT || '5000';
 
 let users = [
     {"name": "Vlad", "email": "kalit@gmail.com", "password": "password", "phone": "380933312313"},
