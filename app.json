@@ -1,0 +1,6 @@
+{
+  "name": "News API",
+  "description": "News API for News App",
+  "keywords": ["node","express",],
+  "repository": "https://github.com/kalitsinskiy/News_API",
+}
