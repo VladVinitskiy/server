@@ -3,12 +3,16 @@ const index = express();
 const axios = require('axios');
 const bodyPareser = require('body-parser');
 const cors = require('cors');
+
+const NEWS_API = 'https://newsapi.org/v2';
+const ukrainian = 'top-headlines?country=ua';
+const everything = 'everything?domains=wsj.com';
 const KEY = '19c35e4ad3b54f4faae2dfc9b75ea8f7';
 const port = process.env.PORT || '5000';
 
 let users = [
-    {"name": "Vlad", "email": "kalit@gmail.com", "password": "password", "phone": "380933312313"},
-    {"name": "USERADMIN", "email": "USERADMIN@com.ua", "password": "Testing1", "phone": "380977777777"},
+    {"name": "Vlad", "surname":"Kalitsinskiy", "email": "kalit@gmail.com", birthday:"2000-09-18", "password": "password", "phone": "380933312313"},
+    {"name": "USERADMIN", "surname":"Important gui", "email": "USERADMIN@com.ua", birthday:"2000-09-21", "password": "Testing1", "phone": "380977777777"},
 ];
 let news = [];
 let session;
@@ -18,24 +22,29 @@ index.use(bodyPareser.urlencoded({extended: true}));
 index.use(cors());
 
 index.get('/news', (req, res) => {
-    axios.get(`https://newsapi.org/v2/top-headlines?sources=techcrunch&apiKey=${KEY}`)
+    axios.get(`${NEWS_API}/${req.query.type === "ukrainian" ? ukrainian : everything}&apiKey=${KEY}`)
         .then(response => {
             return response.data.articles
         })
         .then(data => {
-            return data.map((item, index) => {
+            return data.map(({author, source, title, description, url, urlToImage, publishedAt}) => {
                 return {
-                    author: item.author,
-                    text: item.title,
-                    bigText: item.description,
+                    author: author,
+                    title: title,
+                    description: description,
+                    source:source.name,
+                    url:url,
+                    urlToImage:urlToImage,
+                    publishedAt:publishedAt,
                     comments: [],
                     status: false,
-                    like: Math.round(5 + Math.random() * (100 - 5))
+                    like: Math.round(5 + Math.random() * (100 - 5)),
+                    id: `f${(~~(Math.random()*1e8)).toString(16)}`
                 }
             });
         })
         .then(data => {
-            if (news.length === 0) news.push(...data);
+            news = [...data];
             res.send(news);
         })
         .catch(error => {
@@ -77,16 +86,16 @@ index.get('/me',(req, res) => {
     if (session){
         res.send(session)
     } else {
-        res.send("Need login");
+        res.send(false);
     }
 });
 
 index.get('/logout',(req, res) => {
     if (session) {
-        res.send("Error");
-    }else {
+        res.send(true);
         session = "";
-        res.send("OK");
+    }else {
+        res.send("Error");
     }
 });
 
