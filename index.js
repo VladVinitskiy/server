@@ -11,8 +11,26 @@ const KEY = '19c35e4ad3b54f4faae2dfc9b75ea8f7';
 const port = process.env.PORT || '5000';
 
 let users = [
-    {"name": "Vlad", "surname":"Kalitsinskiy", "email": "kalit@gmail.com", birthday:"2000-09-18", "password": "password", "phone": "380933312313"},
-    {"name": "USERADMIN", "surname":"Important gui", "email": "USERADMIN@com.ua", birthday:"2000-09-21", "password": "Testing1", "phone": "380977777777"},
+    {
+        "name": "Vlad",
+        "surname":"Kalitsinskiy",
+        "email": "kalit@gmail.com",
+        "birthday":"2000-09-18",
+        "password": "password",
+        "phone": "380933312313",
+        "id": `f${(~~(Math.random()*1e8)).toString(16)}`,
+        "role":"admin"
+    },
+    {
+        "name": "USERADMIN",
+        "surname":"Important gui",
+        "email": "USERADMIN@com.ua",
+        "birthday":"2000-09-21",
+        "password": "Testing1",
+        "phone": "380977777777",
+        "id": `f${(~~(Math.random()*1e8)).toString(16)}`,
+        "role":"admin"
+    },
 ];
 let news = [];
 let session;
@@ -57,7 +75,9 @@ index.get('/users', (req, res) => {
 });
 
 index.post('/user', (req, res) => {
-    users.push({...req.body});
+    let id = `f${(~~(Math.random()*1e8)).toString(16)}`;
+    users.push({id, ...req.body});
+
     res.send(req.body);
     console.log(`SIGN UP ${req.body.name}`);
 });
@@ -116,15 +136,23 @@ index.put('/news/:index', (req, res) => {
 
 
 //update data
-index.put('/users/:name', (req, res) => {
-    let user = users.find((user) => {
-        return user.name === req.params.name
+index.put('/user/:id', (req, res) => {
+
+    users.map((user) => {
+        if (user.id === req.params.id) {
+            return Object.assign(user, req.body)
+        }
+        return user;
     });
-    user.email = req.body.email;
-    user.password = req.body.password;
-    user.phone = req.body.phone;
-    res.sendStatus(200);
-    console.log('CHANGE DATA BY ' + req.params.name.toUpperCase());
+
+    let user = users.find(user => user.id === req.params.id),
+    {password, ...respond} = user;
+    session = respond;
+    if (user){
+        res.send(respond)
+    } else {
+        res.error("user doesn't exist");
+    }
 });
 
 //delete data
