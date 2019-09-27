@@ -4,11 +4,13 @@ const axios = require('axios');
 const bodyPareser = require('body-parser');
 const cors = require('cors');
 const _ = require("lodash");
+const randtoken = require('rand-token').suid;
 
 const NEWS_API = 'https://newsapi.org/v2';
 const ukrainian = 'top-headlines?country=ua';
 const everything = 'everything?domains=wsj.com';
 const KEY = '19c35e4ad3b54f4faae2dfc9b75ea8f7';
+
 const port = process.env.PORT || '5000';
 
 let users = [
@@ -27,14 +29,16 @@ let users = [
         "surname":"Important gui",
         "email": "USERADMIN@com.ua",
         "birthday":"2000-09-21",
-        "password": "Testing1",
+        "password": "password",
         "phone": "380977777777",
         "id": `f${(~~(Math.random()*1e8)).toString(16)}`,
         "role":"admin"
     },
 ];
 let news = [];
-let session;
+
+let tokens=[];
+
 
 index.use(bodyPareser.json());
 index.use(bodyPareser.urlencoded({extended: true}));
@@ -49,11 +53,11 @@ index.get('/news', (req, res) => {
             return data.map(({author, source, title, description, url, urlToImage, publishedAt}) => {
                 return {
                     author: author,
-                    title: title,
+                    "title": title,
                     description: description,
                     source:source.name,
                     url:url,
-                    urlToImage:urlToImage,
+                    "urlToImage":urlToImage,
                     publishedAt:publishedAt,
                     comments: [],
                     status: false,
@@ -97,30 +101,37 @@ index.post('/article', (req, res) => {
 
 index.post('/login', (req, res) => {
     const {email, password} = req.body;
+    const user = users.find( user => user.email === email && user.password === password);
 
-    users.map((user)=>{
-        if(user.email === email && user.password === password){
-            const {password, ...response} = user;
-            session = response;
-            res.send(response);
-        }else {
-            res.send("Not found");
-        }
-    });
+    if(user){
+        const {password, ...response} = user;
+        const token = randtoken(16);
+
+        tokens.push({"token": token, "id": user.id});
+        tokens =_.uniqBy(tokens, 'id');
+
+        // res.cookie('token',token, { maxAge:  60000 * 15 });
+        res.send({response, token});
+    }else {
+        res.send("Not found");
+    }
 });
 
-index.get('/me',(req, res) => {
-    if (session){
-        res.send(session)
+index.get('/session',(req, res) => {
+    const userId = tokens.find(item => item.token === req.query.token).id;
+    const user = users.find(item => item.id === userId);
+    const {password, ...respond} = user;
+    if (user){
+        res.send(respond)
     } else {
         res.send(false);
     }
 });
 
 index.get('/logout',(req, res) => {
-    if (session) {
-        res.send(true);
-        session = "";
+    if (req.query.token) {
+        tokens = tokens.filter((item) => req.query.token !== item.token);
+        res.send("OK");
     }else {
         res.send("Error");
     }
