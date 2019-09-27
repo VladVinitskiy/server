@@ -13,8 +13,6 @@ const KEY = '19c35e4ad3b54f4faae2dfc9b75ea8f7';
 
 const port = process.env.PORT || '5000';
 
-console.log(process.env);
-
 let users = [
     {
         "name": "Vlad",
@@ -47,6 +45,8 @@ index.use(bodyPareser.urlencoded({extended: true}));
 index.use(cors());
 
 index.get('/news', (req, res) => {
+    console.log(process.env);
+
     axios.get(`${NEWS_API}/${req.query.type === "ukrainian" ? ukrainian : everything}&apiKey=${KEY}`)
         .then(response => {
             return response.data.articles
