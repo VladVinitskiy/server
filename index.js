@@ -13,6 +13,8 @@ const KEY = '19c35e4ad3b54f4faae2dfc9b75ea8f7';
 
 const port = process.env.PORT || '5000';
 
+console.log(process.env);
+
 let users = [
     {
         "name": "Vlad",
