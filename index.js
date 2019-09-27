@@ -45,8 +45,6 @@ index.use(bodyPareser.urlencoded({extended: true}));
 index.use(cors());
 
 index.get('/news', (req, res) => {
-    console.log(process.env);
-
     axios.get(`${NEWS_API}/${req.query.type === "ukrainian" ? ukrainian : everything}&apiKey=${KEY}`)
         .then(response => {
             return response.data.articles
