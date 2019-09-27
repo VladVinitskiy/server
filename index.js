@@ -3,6 +3,7 @@ const index = express();
 const axios = require('axios');
 const bodyPareser = require('body-parser');
 const cors = require('cors');
+const _ = require("lodash");
 
 const NEWS_API = 'https://newsapi.org/v2';
 const ukrainian = 'top-headlines?country=ua';
@@ -62,7 +63,7 @@ index.get('/news', (req, res) => {
             });
         })
         .then(data => {
-            news = [...data];
+            news = _.unionBy(news, data, "publishedAt");
             res.send(news);
         })
         .catch(error => {
@@ -82,9 +83,15 @@ index.post('/user', (req, res) => {
     console.log(`SIGN UP ${req.body.name}`);
 });
 
-index.post('/news', (req, res) => {
-    news.unshift({...req.body});
-    res.send(req.body);
+index.post('/article', (req, res) => {
+    const newArticle = {
+        id: `f${(~~(Math.random() * 1e8)).toString(16)}`,
+        ...req.body
+    };
+
+    news.unshift(newArticle);
+
+    res.send(newArticle);
 });
 
 
