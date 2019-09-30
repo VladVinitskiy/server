@@ -5,6 +5,7 @@ const bodyPareser = require('body-parser');
 const cors = require('cors');
 const _ = require("lodash");
 const randtoken = require('rand-token').suid;
+const fileUpload = require('express-fileupload');
 
 const NEWS_API = 'https://newsapi.org/v2';
 const ukrainian = 'top-headlines?country=ua';
@@ -26,7 +27,7 @@ let users = [
     },
     {
         "name": "USERADMIN",
-        "surname":"Important gui",
+        "surname":"Adm",
         "email": "USERADMIN@com.ua",
         "birthday":"2000-09-21",
         "password": "password",
@@ -35,7 +36,10 @@ let users = [
         "role":"admin"
     },
 ];
-let news = [];
+let news = {
+    "global":[],
+    "ukrainian":[]
+};
 
 let tokens=[];
 
@@ -43,9 +47,14 @@ let tokens=[];
 index.use(bodyPareser.json());
 index.use(bodyPareser.urlencoded({extended: true}));
 index.use(cors());
+index.use(fileUpload());
+index.use('/images', express.static(__dirname + '/images'));
 
 index.get('/news', (req, res) => {
-    axios.get(`${NEWS_API}/${req.query.type === "ukrainian" ? ukrainian : everything}&apiKey=${KEY}`)
+    const type = req.query.type === "ukrainian" ? "ukrainian" : "global";
+    let cluster = JSON.parse(JSON.stringify(type));
+
+    axios.get(`${NEWS_API}/${type === "ukrainian" ? ukrainian : everything}&apiKey=${KEY}`)
         .then(response => {
             return response.data.articles
         })
@@ -61,14 +70,13 @@ index.get('/news', (req, res) => {
                     publishedAt:publishedAt,
                     comments: [],
                     status: false,
-                    like: Math.round(5 + Math.random() * (100 - 5)),
                     id: `f${(~~(Math.random()*1e8)).toString(16)}`
                 }
             });
         })
         .then(data => {
-            news = _.unionBy(news, data, "publishedAt");
-            res.send(news);
+            news[cluster] = _.unionBy(news[cluster], data, "publishedAt");
+            res.send(news[cluster]);
         })
         .catch(error => {
             console.log(error);
@@ -92,9 +100,17 @@ index.post('/article', (req, res) => {
         id: `f${(~~(Math.random() * 1e8)).toString(16)}`,
         ...req.body
     };
+    const type = req.query.type === "ukrainian" ? "ukrainian" : "global";
+    const cluster = JSON.parse(JSON.stringify(type));
 
-    news.unshift(newArticle);
+    if(req.files && req.files.main_image){
+        const imageFile = req.files.main_image;
 
+        newArticle.urlToImage = `${req.protocol}://${req.headers.host}/images/${imageFile.name}`;
+        imageFile.mv(`${__dirname}/images/${imageFile.name}`);
+    }
+
+    news[cluster].unshift(newArticle);
     res.send(newArticle);
 });
 
@@ -155,7 +171,6 @@ index.put('/news/:index', (req, res) => {
 
 //update data
 index.put('/user/:id', (req, res) => {
-
     users.map((user) => {
         if (user.id === req.params.id) {
             return Object.assign(user, req.body)
@@ -165,7 +180,6 @@ index.put('/user/:id', (req, res) => {
 
     let user = users.find(user => user.id === req.params.id),
     {password, ...respond} = user;
-    session = respond;
     if (user){
         res.send(respond)
     } else {
@@ -182,5 +196,14 @@ index.delete('/users/:name', (req, res) => {
     console.log('DELETE USER ' + req.params.name.toUpperCase());
 });
 
+index.delete('/article', (req, res) => {
+    const {id, type} = req.query;
+    let cluster = JSON.parse(JSON.stringify(type));
+
+    news[cluster] = news[cluster].filter((item) => {
+        return item.id !== id;
+    });
+    res.sendStatus(200);
+});
 
 index.listen(port, () => console.log(`listening on port ${port}`));
