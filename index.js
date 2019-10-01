@@ -8,8 +8,8 @@ const randtoken = require('rand-token').suid;
 const fileUpload = require('express-fileupload');
 
 const NEWS_API = 'https://newsapi.org/v2';
-const ukrainian = 'top-headlines?country=ua';
-const everything = 'everything?domains=wsj.com';
+const source = 'top-headlines?country=';
+const global = 'everything?domains=wsj.com';
 const KEY = '19c35e4ad3b54f4faae2dfc9b75ea8f7';
 
 const port = process.env.PORT || '5000';
@@ -37,8 +37,7 @@ let users = [
     },
 ];
 let news = {
-    "global":[],
-    "ukrainian":[]
+    "global":[]
 };
 
 let tokens=[];
@@ -51,10 +50,10 @@ index.use(fileUpload());
 index.use('/images', express.static(__dirname + '/images'));
 
 index.get('/news', (req, res) => {
-    const type = req.query.type === "ukrainian" ? "ukrainian" : "global";
-    let cluster = JSON.parse(JSON.stringify(type));
+    const countryCode = req.query.source ? req.query.source : "global";
+    const cluster = JSON.parse(JSON.stringify(countryCode));
 
-    axios.get(`${NEWS_API}/${type === "ukrainian" ? ukrainian : everything}&apiKey=${KEY}`)
+    axios.get(`${NEWS_API}/${countryCode === "global" ? global : `${source}${countryCode}`}&apiKey=${KEY}`)
         .then(response => {
             return response.data.articles
         })
@@ -100,8 +99,8 @@ index.post('/article', (req, res) => {
         id: `f${(~~(Math.random() * 1e8)).toString(16)}`,
         ...req.body
     };
-    const type = req.query.type === "ukrainian" ? "ukrainian" : "global";
-    const cluster = JSON.parse(JSON.stringify(type));
+    const source = req.query.source ? req.query.source : "global";
+    const cluster = JSON.parse(JSON.stringify(source));
 
     if(req.files && req.files.main_image){
         const imageFile = req.files.main_image;
@@ -134,13 +133,17 @@ index.post('/login', (req, res) => {
 });
 
 index.get('/session',(req, res) => {
-    const userId = tokens.find(item => item.token === req.query.token).id;
-    const user = users.find(item => item.id === userId);
-    const {password, ...respond} = user;
-    if (user){
-        res.send(respond)
-    } else {
+    if (tokens.length===0){
         res.send(false);
+    } else {
+        const userId = tokens.find(item => item.token === req.query.token).id;
+        const user = users.find(item => item.id === userId);
+        const {password, ...respond} = user;
+        if (user){
+            res.send(respond)
+        } else {
+            res.send(false);
+        }
     }
 });
 
@@ -203,7 +206,7 @@ index.delete('/article', (req, res) => {
     news[cluster] = news[cluster].filter((item) => {
         return item.id !== id;
     });
-    res.sendStatus(200);
+    res.send({id: id});
 });
 
 index.listen(port, () => console.log(`listening on port ${port}`));
