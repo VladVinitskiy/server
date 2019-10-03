@@ -65,7 +65,7 @@ index.get('/news', (req, res) => {
                     description: description,
                     source:source.name,
                     url:url,
-                    "urlToImage":urlToImage,
+                    "urlToImage": (urlToImage && urlToImage.split("://")[0] === "http") ? `https://${urlToImage.split("://")[1]}` : urlToImage,
                     publishedAt:publishedAt,
                     comments: [],
                     status: false,
