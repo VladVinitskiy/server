@@ -6,6 +6,9 @@ const cors = require('cors');
 const _ = require("lodash");
 const randtoken = require('rand-token').suid;
 const fileUpload = require('express-fileupload');
+const geoip = require('geoip-lite');
+const jwtDecode = require('jwt-decode');
+const moment = require('moment');
 
 const NEWS_API = 'https://newsapi.org/v2';
 const source = 'top-headlines?country=';
@@ -41,6 +44,7 @@ let news = {
 };
 
 let tokens=[];
+let statistics = [];
 
 
 index.use(bodyPareser.json());
@@ -50,7 +54,7 @@ index.use(fileUpload());
 index.use('/images', express.static(__dirname + '/images'));
 
 index.get('/news', (req, res) => {
-    const countryCode = req.query.source ? req.query.source : "global";
+    const countryCode = req.query.source;
     const cluster = JSON.parse(JSON.stringify(countryCode));
 
     axios.get(`${NEWS_API}/${countryCode === "global" ? global : `${source}${countryCode}`}&apiKey=${KEY}`)
@@ -92,6 +96,29 @@ index.post('/user', (req, res) => {
 
     res.send(req.body);
     console.log(`SIGN UP ${req.body.name}`);
+});
+
+index.post('/stats', (req, res) => {
+    const ip = jwtDecode(req.query.token).token;
+    const geo = geoip.lookup(ip);
+    const {country, city, timezone, ll, range} = geo;
+    const same = statistics.find((item)=> item.ip === ip);
+
+    if(!same){
+        statistics.unshift({ip, country, city, timezone, ll, range,
+            visitedAt : moment().utc().format('YYYY-MM-DD HH:mm')
+        });
+    }else {
+        const now = new Date(moment().utc().format('YYYY-MM-DD HH:mm'));
+        const expiration = new Date(same.visitedAt);
+        if ((now - expiration) >= 5){
+            statistics.unshift({ip, country, city, timezone, ll, range,
+                visitedAt : moment().utc().format('YYYY-MM-DD HH:mm')
+            });
+        }
+    }
+
+    res.sendStatus(200);
 });
 
 index.post('/article', (req, res) => {
