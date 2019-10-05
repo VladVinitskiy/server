@@ -53,6 +53,12 @@ index.use(cors());
 index.use(fileUpload());
 index.use('/images', express.static(__dirname + '/images'));
 
+index.get('/', (req, res) => {
+    res.send("Heroku doesn't sleep")
+});
+
+setInterval(()=>axios.get(`https://newssss-api.herokuapp.com/`), 300000);
+
 index.get('/news', (req, res) => {
     const countryCode = req.query.source;
     const cluster = JSON.parse(JSON.stringify(countryCode));
@@ -88,6 +94,10 @@ index.get('/news', (req, res) => {
 
 index.get('/users', (req, res) => {
     res.send(users);
+});
+
+index.get('/stats', (req, res) => {
+    res.send(statistics);
 });
 
 index.post('/user', (req, res) => {
