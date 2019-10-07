@@ -44,7 +44,9 @@ let news = {
 };
 
 let tokens=[];
-let statistics = [];
+
+const stats = require('./stats');
+let statistics = stats;
 
 
 index.use(bodyPareser.json());
@@ -63,40 +65,54 @@ index.get('/news', (req, res) => {
     const countryCode = req.query.source;
     const cluster = JSON.parse(JSON.stringify(countryCode));
 
-    axios.get(`${NEWS_API}/${countryCode === "global" ? global : `${source}${countryCode}`}&apiKey=${KEY}`)
-        .then(response => {
-            return response.data.articles
-        })
-        .then(data => {
-            return data.map(({author, source, title, description, url, urlToImage, publishedAt}) => {
-                return {
-                    author: author,
-                    "title": title,
-                    description: description,
-                    source:source.name,
-                    url:url,
-                    "urlToImage": (urlToImage && urlToImage.split("://")[0] === "http") ? `https://${urlToImage.split("://")[1]}` : urlToImage,
-                    publishedAt:publishedAt,
-                    comments: [],
-                    status: false,
-                    id: `f${(~~(Math.random()*1e8)).toString(16)}`
-                }
+    if (countryCode === "cs"){
+        news[cluster] = [{
+            author: null,
+            comments: [],
+            description: "American troops began withdrawing from the Syria-Turkey border, marking a major shift in U.S. policy as Washington pulls back from a key partner in the fight against Islamic State—the Kurds—ahead of a Turkish offensive against them. Photo: Delil Souleiman / G…",
+            id: "f951cd34ds",
+            publishedAt: "2019-10-07T16:59:41Z",
+            source: "The Wall Street Journal",
+            title: "U.S. Begins Withdrawal of Troops From Northern Syria",
+            url: "https://www.wsj.com/video/us-begins-withdrawal-of-troops-from-northern-syria/D2EB5109-345A-4D97-8C39-2AE99AC56E45.html",
+            urlToImage: "https://m.wsj.net/video/20191007/100719ussyria/100719ussyria_1280x720.jpg"
+        }];
+        res.send(news[cluster]);
+    } else {
+        axios.get(`${NEWS_API}/${countryCode === "global" ? global : `${source}${countryCode}`}&apiKey=${KEY}`)
+            .then(response => {
+                return response.data.articles
+            })
+            .then(data => {
+                return data.map(({author, source, title, description, url, urlToImage, publishedAt}) => {
+                    return {
+                        author: author,
+                        "title": title,
+                        description: description,
+                        source:source.name,
+                        url:url,
+                        "urlToImage": (urlToImage && urlToImage.split("://")[0] === "http") ? `https://${urlToImage.split("://")[1]}` : urlToImage,
+                        publishedAt:publishedAt,
+                        comments: [],
+                        id: `f${(~~(Math.random()*1e8)).toString(16)}`
+                    }
+                });
+            })
+            .then(data => {
+                news[cluster] = _.unionBy(news[cluster], data, "publishedAt");
+                res.send(news[cluster]);
+            })
+            .catch(error => {
+                console.log(error);
             });
-        })
-        .then(data => {
-            news[cluster] = _.unionBy(news[cluster], data, "publishedAt");
-            res.send(news[cluster]);
-        })
-        .catch(error => {
-            console.log(error);
-        });
+    }
 });
 
 index.get('/users', (req, res) => {
     res.send(users);
 });
 
-index.get('/stats', (req, res) => {
+index.get('/statistics', (req, res) => {
     res.send(statistics);
 });
 
@@ -108,7 +124,7 @@ index.post('/user', (req, res) => {
     console.log(`SIGN UP ${req.body.name}`);
 });
 
-index.post('/stats', (req, res) => {
+index.post('/statistics', (req, res) => {
     const ip = jwtDecode(req.query.token).token;
     const geo = geoip.lookup(ip);
     const {country, city, timezone, ll, range} = geo;
@@ -123,7 +139,7 @@ index.post('/stats', (req, res) => {
         const expiration = new Date(same.visitedAt);
         if ((now - expiration) >= 5){
             statistics.unshift({ip, country, city, timezone, ll, range,
-                visitedAt : moment().utc().format('YYYY-MM-DD HH:mm')
+                visitedAt: new Date().toString(),
             });
         }
     }
@@ -245,5 +261,9 @@ index.delete('/article', (req, res) => {
     });
     res.send({id: id});
 });
+
+// index.get('/download_stats', function(req, res){
+//     res.download(`${__dirname}/stats.json`);
+// });
 
 index.listen(port, () => console.log(`listening on port ${port}`));
