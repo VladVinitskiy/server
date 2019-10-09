@@ -1,5 +1,6 @@
 const express = require('express');
 const index = express();
+const server = require('http').createServer(index);//new for sockets
 const axios = require('axios');
 const bodyPareser = require('body-parser');
 const cors = require('cors');
@@ -9,6 +10,8 @@ const fileUpload = require('express-fileupload');
 const geoip = require('geoip-lite');
 const jwtDecode = require('jwt-decode');
 const moment = require('moment');
+const fs = require('fs');
+const io = require('socket.io')(server);
 
 const NEWS_API = 'https://newsapi.org/v2';
 const source = 'top-headlines?country=';
@@ -21,7 +24,7 @@ let users = [
     {
         "name": "Vlad",
         "surname":"Kalitsinskiy",
-        "email": "kalit@gmail.com",
+        "email": "kalitsinskij.46@gmail.com",
         "birthday":"2000-09-18",
         "password": "password",
         "phone": "380933312313",
@@ -29,12 +32,12 @@ let users = [
         "role":"admin"
     },
     {
-        "name": "USERADMIN",
-        "surname":"Adm",
-        "email": "USERADMIN@com.ua",
-        "birthday":"2000-09-21",
+        "name": "Yura",
+        "surname":"Didenko",
+        "email": "Yura14092000@icloud.com",
+        "birthday":"2000-09-12",
         "password": "password",
-        "phone": "380977777777",
+        "phone": "+63 (755) 332-5768",
         "id": `f${(~~(Math.random()*1e8)).toString(16)}`,
         "role":"admin"
     },
@@ -59,7 +62,7 @@ index.get('/', (req, res) => {
     res.send("Heroku doesn't sleep")
 });
 
-setInterval(()=>axios.get(`https://newssss-api.herokuapp.com/`), 300000);
+// setInterval(()=>axios.get(`https://newssss-api.herokuapp.com/`), 300000);
 
 index.get('/news', (req, res) => {
     const countryCode = req.query.source;
@@ -67,15 +70,15 @@ index.get('/news', (req, res) => {
 
     if (countryCode === "cs"){
         news[cluster] = [{
-            author: null,
+            author: "Vlados",
             comments: [],
-            description: "American troops began withdrawing from the Syria-Turkey border, marking a major shift in U.S. policy as Washington pulls back from a key partner in the fight against Islamic State—the Kurds—ahead of a Turkish offensive against them. Photo: Delil Souleiman / G…",
-            id: "f951cd34ds",
+            description: "Він держе холодільнік шоб не наїбнувся",
+            id: "f951cd342ds",
             publishedAt: "2019-10-07T16:59:41Z",
-            source: "The Wall Street Journal",
-            title: "U.S. Begins Withdrawal of Troops From Northern Syria",
-            url: "https://www.wsj.com/video/us-begins-withdrawal-of-troops-from-northern-syria/D2EB5109-345A-4D97-8C39-2AE99AC56E45.html",
-            urlToImage: "https://m.wsj.net/video/20191007/100719ussyria/100719ussyria_1280x720.jpg"
+            source: "SIRNUK",
+            title: "Стрижавка вражає",
+            url: "",
+            urlToImage: `http://localhost:5000/images/IMG_20191008_132706.jpg`
         }];
         res.send(news[cluster]);
     } else {
@@ -129,20 +132,24 @@ index.post('/statistics', (req, res) => {
     const geo = geoip.lookup(ip);
     const {country, city, timezone, ll, range} = geo;
     const same = statistics.find((item)=> item.ip === ip);
+    const data = {
+        ip, country, city, timezone, ll, range,
+        visitedAt : moment().utc().format('YYYY-MM-DD HH:mm')
+    };
 
     if(!same){
-        statistics.unshift({ip, country, city, timezone, ll, range,
-            visitedAt : moment().utc().format('YYYY-MM-DD HH:mm')
-        });
+        statistics.unshift(data);
     }else {
         const now = new Date(moment().utc().format('YYYY-MM-DD HH:mm'));
         const expiration = new Date(same.visitedAt);
         if ((now - expiration) >= 5){
-            statistics.unshift({ip, country, city, timezone, ll, range,
-                visitedAt: new Date().toString(),
-            });
+            statistics.unshift(data);
         }
     }
+
+    fs.writeFile(`${__dirname}/stats.json`, JSON.stringify(statistics, null, 4), (err) => {
+        if (err) {  console.error(err);  return }
+    });
 
     res.sendStatus(200);
 });
@@ -166,6 +173,29 @@ index.post('/article', (req, res) => {
     res.send(newArticle);
 });
 
+index.post('/comment', (req, res) => {
+    const {source, articleId} = req.query;
+    const cluster = JSON.parse(JSON.stringify(source));
+    news[cluster].map((article) => {
+        if (article.id === articleId) {
+            const comment = {id: `f${(~~(Math.random() * 1e8)).toString(16)}`, ...req.body};
+
+            article.comments.unshift(comment);
+            res.send({id:article.id, comment});
+        }
+    });
+});
+
+index.delete('/comment', (req, res) => {
+    const {source, articleId, commentId} = req.query;
+    const cluster = JSON.parse(JSON.stringify(source));
+    news[cluster].map((article) => {
+        if (article.id === articleId) {
+            article.comments = article.comments.filter(({id})=> id !== commentId);
+            res.send({articleId, commentId});
+        }
+    });
+});
 
 index.post('/login', (req, res) => {
     const {email, password} = req.body;
@@ -266,4 +296,39 @@ index.delete('/article', (req, res) => {
 //     res.download(`${__dirname}/stats.json`);
 // });
 
-index.listen(port, () => console.log(`listening on port ${port}`));
+
+io.on('connection', function(socket){
+    console.log('user connected');
+
+    socket.on('post comment', function(data){
+        console.log(data);
+        const {newsSource, id, author, content, publishedAt} = data;
+        const cluster = JSON.parse(JSON.stringify(newsSource));
+        news[cluster].map((article) => {
+            if (article.id === id) {
+                const comment = {id: `f${(~~(Math.random() * 1e8)).toString(16)}`, author, comment: content, publishedAt};
+                article.comments.unshift(comment);
+                io.emit('post comment',{id:article.id, comment});
+            }
+        });
+    });
+
+    socket.on('delete comment', function(data){
+        console.log(data);
+        const {newsSource, articleId, commentId} = data;
+        const cluster = JSON.parse(JSON.stringify(newsSource));
+        news[cluster].map((article) => {
+            if (article.id === articleId) {
+                article.comments = article.comments.filter(({id})=> id !== commentId);
+                io.emit('delete comment',{articleId, commentId});
+            }
+        });
+    });
+
+    socket.on('disconnect', function(){
+        console.log('user disconnected');
+    });
+});
+
+server.listen(port, () => console.log(`listening on port ${port}`));
+// index.listen(port, () => console.log(`listening on port ${port}`));
