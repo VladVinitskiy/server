@@ -13,44 +13,21 @@ const moment = require('moment');
 const fs = require('fs');
 const io = require('socket.io')(server);
 
+const stats = require('./stats');
+const Users = require('./users');
+
 const NEWS_API = 'https://newsapi.org/v2';
 const source = 'top-headlines?country=';
 const global = 'everything?domains=wsj.com';
 const KEY = '19c35e4ad3b54f4faae2dfc9b75ea8f7';
-
 const port = process.env.PORT || '5000';
 
-let users = [
-    {
-        "name": "Vlad",
-        "surname":"Kalitsinskiy",
-        "email": "kalitsinskij.46@gmail.com",
-        "birthday":"2000-09-18",
-        "password": "password",
-        "phone": "380933312313",
-        "id": `f${(~~(Math.random()*1e8)).toString(16)}`,
-        "role":"admin"
-    },
-    {
-        "name": "Yura",
-        "surname":"Didenko",
-        "email": "Yura14092000@icloud.com",
-        "birthday":"2000-09-12",
-        "password": "password",
-        "phone": "+63 (755) 332-5768",
-        "id": `f${(~~(Math.random()*1e8)).toString(16)}`,
-        "role":"admin"
-    },
-];
+let users = Users;
+let tokens=[];
+let statistics = stats;
 let news = {
     "global":[]
 };
-
-let tokens=[];
-
-const stats = require('./stats');
-let statistics = stats;
-
 
 index.use(bodyPareser.json());
 index.use(bodyPareser.urlencoded({extended: true}));
@@ -58,57 +35,42 @@ index.use(cors());
 index.use(fileUpload());
 index.use('/images', express.static(__dirname + '/images'));
 
-index.get('/', (req, res) => {
-    res.send("Heroku doesn't sleep")
-});
-
 // setInterval(()=>axios.get(`https://newssss-api.herokuapp.com/`), 300000);
+
+index.get('/', (req, res) => {
+    res.send("api-news doesn't sleep")
+});
 
 index.get('/news', (req, res) => {
     const countryCode = req.query.source;
     const cluster = JSON.parse(JSON.stringify(countryCode));
 
-    if (countryCode === "cs"){
-        news[cluster] = [{
-            author: "Vlados",
-            comments: [],
-            description: "Він держе холодільнік шоб не наїбнувся",
-            id: "f951cd342ds",
-            publishedAt: "2019-10-07T16:59:41Z",
-            source: "SIRNUK",
-            title: "Стрижавка вражає",
-            url: "",
-            urlToImage: `http://localhost:5000/images/IMG_20191008_132706.jpg`
-        }];
-        res.send(news[cluster]);
-    } else {
-        axios.get(`${NEWS_API}/${countryCode === "global" ? global : `${source}${countryCode}`}&apiKey=${KEY}`)
-            .then(response => {
-                return response.data.articles
-            })
-            .then(data => {
-                return data.map(({author, source, title, description, url, urlToImage, publishedAt}) => {
-                    return {
-                        author: author,
-                        "title": title,
-                        description: description,
-                        source:source.name,
-                        url:url,
-                        "urlToImage": (urlToImage && urlToImage.split("://")[0] === "http") ? `https://${urlToImage.split("://")[1]}` : urlToImage,
-                        publishedAt:publishedAt,
-                        comments: [],
-                        id: `f${(~~(Math.random()*1e8)).toString(16)}`
-                    }
-                });
-            })
-            .then(data => {
-                news[cluster] = _.unionBy(news[cluster], data, "publishedAt");
-                res.send(news[cluster]);
-            })
-            .catch(error => {
-                console.log(error);
+    axios.get(`${NEWS_API}/${countryCode === "global" ? global : `${source}${countryCode}`}&apiKey=${KEY}`)
+        .then(response => {
+            return response.data.articles
+        })
+        .then(data => {
+            return data.map(({author, source, title, description, url, urlToImage, publishedAt}) => {
+                return {
+                    author: author,
+                    "title": title,
+                    description: description,
+                    source: source.name,
+                    url: url,
+                    "urlToImage": (urlToImage && urlToImage.split("://")[0] === "http") ? `https://${urlToImage.split("://")[1]}` : urlToImage,
+                    publishedAt: publishedAt,
+                    comments: [],
+                    id: `f${(~~(Math.random() * 1e8)).toString(16)}`
+                }
             });
-    }
+        })
+        .then(data => {
+            news[cluster] = _.unionBy(news[cluster], data, "publishedAt");
+            res.send(news[cluster]);
+        })
+        .catch(() => {
+            res.send("Error");
+        });
 });
 
 index.get('/users', (req, res) => {
@@ -123,8 +85,11 @@ index.post('/user', (req, res) => {
     let id = `f${(~~(Math.random()*1e8)).toString(16)}`;
     users.push({id, ...req.body});
 
+    fs.writeFile(`${__dirname}/users.json`, JSON.stringify(users, null, 4), (err) => {
+        if (err) {  console.error(err);  return false }
+    });
+
     res.send(req.body);
-    console.log(`SIGN UP ${req.body.name}`);
 });
 
 index.post('/statistics', (req, res) => {
@@ -148,7 +113,7 @@ index.post('/statistics', (req, res) => {
     }
 
     fs.writeFile(`${__dirname}/stats.json`, JSON.stringify(statistics, null, 4), (err) => {
-        if (err) {  console.error(err);  return }
+        if (err) {  console.error(err);  return false }
     });
 
     res.sendStatus(200);
@@ -211,7 +176,7 @@ index.post('/login', (req, res) => {
         // res.cookie('token',token, { maxAge:  60000 * 15 });
         res.send({response, token});
     }else {
-        res.send("Not found");
+        res.send(false);
     }
 });
 
@@ -292,9 +257,20 @@ index.delete('/article', (req, res) => {
     res.send({id: id});
 });
 
-// index.get('/download_stats', function(req, res){
-//     res.download(`${__dirname}/stats.json`);
-// });
+index.get('/download', function(req, res){   //download?id=f5aa21&type=stats
+    const {id, type} = req.query;
+    const admin = users.find(user => user.id === id);
+
+    if(admin){
+        if (type === "stats"){
+            res.download(`${__dirname}/stats.json`);
+        } else if(type === "users"){
+            res.download(`${__dirname}/users.json`);
+        }
+    }else {
+        res.send("Permission deny")
+    }
+});
 
 
 io.on('connection', function(socket){
