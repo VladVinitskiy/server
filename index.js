@@ -9,7 +9,6 @@ const randtoken = require('rand-token').suid;
 const fileUpload = require('express-fileupload');
 const geoip = require('geoip-lite');
 const jwtDecode = require('jwt-decode');
-const moment = require('moment');
 const fs = require('fs');
 const io = require('socket.io')(server);
 
@@ -38,7 +37,7 @@ index.use('/images', express.static(__dirname + '/images'));
 // setInterval(()=>axios.get(`https://newssss-api.herokuapp.com/`), 300000);
 
 index.get('/', (req, res) => {
-    res.send("api-news doesn't sleep")
+    res.send("Hello, it's a news-api")
 });
 
 index.get('/news', (req, res) => {
@@ -96,21 +95,12 @@ index.post('/statistics', (req, res) => {
     const ip = jwtDecode(req.query.token).token;
     const geo = geoip.lookup(ip);
     const {country, city, timezone, ll, range} = geo;
-    const same = statistics.find((item)=> item.ip === ip);
     const data = {
         ip, country, city, timezone, ll, range,
-        visitedAt : moment().utc().format('YYYY-MM-DD HH:mm')
+        visitedAt : req.body.date
     };
 
-    if(!same){
-        statistics.unshift(data);
-    }else {
-        const now = new Date(moment().utc().format('YYYY-MM-DD HH:mm'));
-        const expiration = new Date(same.visitedAt);
-        if ((now - expiration) >= 5){
-            statistics.unshift(data);
-        }
-    }
+    statistics.unshift(data);
 
     fs.writeFile(`${__dirname}/stats.json`, JSON.stringify(statistics, null, 4), (err) => {
         if (err) {  console.error(err);  return false }
@@ -204,23 +194,6 @@ index.get('/logout',(req, res) => {
     }
 });
 
-
-index.put('/news/:index', (req, res) => {
-    news.map((article, index) => {
-        if (index === +req.params.index.slice(1)) {
-            return article.comments.push({
-                user: req.body.user,
-                comment: req.body.msg
-            });
-        }
-        return article
-    });
-    res.sendStatus(200);
-    console.log('ADD COMMENT BY ' + req.body.user);
-});
-
-
-//update data
 index.put('/user/:id', (req, res) => {
     users.map((user) => {
         if (user.id === req.params.id) {
@@ -238,14 +211,6 @@ index.put('/user/:id', (req, res) => {
     }
 });
 
-//delete data
-index.delete('/users/:name', (req, res) => {
-    users = users.filter((user) => {
-        return user.name !== req.params.name;
-    });
-    res.sendStatus(200);
-    console.log('DELETE USER ' + req.params.name.toUpperCase());
-});
 
 index.delete('/article', (req, res) => {
     const {id, type} = req.query;
@@ -274,10 +239,7 @@ index.get('/download', function(req, res){   //download?id=f5aa21&type=stats
 
 
 io.on('connection', function(socket){
-    console.log('user connected');
-
-    socket.on('post comment', function(data){
-        console.log(data);
+    socket.on('post comment', (data) => {
         const {newsSource, id, author, content, publishedAt} = data;
         const cluster = JSON.parse(JSON.stringify(newsSource));
         news[cluster].map((article) => {
@@ -289,8 +251,7 @@ io.on('connection', function(socket){
         });
     });
 
-    socket.on('delete comment', function(data){
-        console.log(data);
+    socket.on('delete comment', (data) => {
         const {newsSource, articleId, commentId} = data;
         const cluster = JSON.parse(JSON.stringify(newsSource));
         news[cluster].map((article) => {
@@ -301,9 +262,7 @@ io.on('connection', function(socket){
         });
     });
 
-    socket.on('disconnect', function(){
-        console.log('user disconnected');
-    });
+    // socket.on('disconnect', () =>{});
 });
 
 server.listen(port, () => console.log(`listening on port ${port}`));
