@@ -128,6 +128,31 @@ index.post('/article', (req, res) => {
     res.send(newArticle);
 });
 
+index.put('/article', (req, res) => {
+    const editArticle = {...req.body};
+    const cluster = JSON.parse(JSON.stringify(req.query.source));
+    let find = false;
+
+    news[cluster].forEach((item, index)=>{
+        if(item.id === editArticle.id){
+            if(req.files && req.files.main_image){
+                const imageFile = req.files.main_image;
+
+                editArticle.urlToImage = `${req.protocol}://${req.headers.host}/images/${imageFile.name}`;
+                imageFile.mv(`${__dirname}/images/${imageFile.name}`);
+            }
+            find = true;
+            news[cluster][index] =  editArticle;
+        }
+    });
+
+    if (find){
+        res.send(editArticle);
+    } else {
+        res.status(500).send("Something went wrong");
+    }
+});
+
 index.post('/comment', (req, res) => {
     const {source, articleId} = req.query;
     const cluster = JSON.parse(JSON.stringify(source));
