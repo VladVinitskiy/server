@@ -93,7 +93,7 @@ index.post('/statistics', (req, res) => {
 index.post('/article', (req, res) => {
     const {author, title, description, source, publishedAt} = req.body;
     const cluster = JSON.parse(JSON.stringify(req.query.source ? req.query.source : "global"));
-    const imageFile = req.files.main_image;
+    const imageFile = req.files && req.files.main_image;
 
     const article = new News({
         author, title,
@@ -108,7 +108,7 @@ index.post('/article', (req, res) => {
     });
 
 
-    if(req.files && req.files.main_image){
+    if(imageFile){
         article.urlToImage = `${req.protocol}://${req.headers.host}/images/${imageFile.name}`;
         imageFile.mv(`${__dirname}/images/${imageFile.name}`);
 
