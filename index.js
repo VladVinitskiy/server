@@ -33,7 +33,7 @@ index.use(bodyPareser.json());
 index.use(bodyPareser.urlencoded({extended: true}));
 index.use(cors());
 index.use(fileUpload());
-index.use(express.static(path.join(__dirname, 'images')));
+index.use('/images', express.static(path.join(__dirname, 'images')));
 
 mongoose.connect( uri, { useNewUrlParser: true, useUnifiedTopology: true, useCreateIndex: true });
 
