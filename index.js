@@ -8,6 +8,7 @@ const _ = require("lodash");
 const randtoken = require('rand-token').suid;
 const fileUpload = require('express-fileupload');
 const geoip = require('geoip-lite');
+const jwt = require('jsonwebtoken');
 const jwtDecode = require('jwt-decode');
 const fs = require('fs');
 const io = require('socket.io')(server);
@@ -37,6 +38,9 @@ index.use('/images', express.static(path.join(__dirname, 'images')));
 
 mongoose.connect( uri, { useNewUrlParser: true, useUnifiedTopology: true, useCreateIndex: true });
 
+//rewrite all available images in mongo cloud after reload api
+Image.find().exec().then((response) => response.map(({name, img}) => fs.writeFile(`images/${name}`, img, function (err) {})));
+
 index.get('/', (req, res) => {
     res.send("Hello, it's a news-api")
 });
@@ -65,7 +69,12 @@ index.get('/statistics', (req, res) => {
 });
 
 index.post('/user', (req, res) => {
-    const user = new User({...req.body, _id: new mongoose.Types.ObjectId()});
+    const {password, ...rest} = req.body;
+
+    const user = new User({
+        ...rest,
+        password: jwt.sign({password}, 'cryptoPassword'),
+        id: new mongoose.Types.ObjectId()});
 
     user.save()
         .then( response => res.status(200).json(response))
@@ -149,17 +158,19 @@ index.put('/article', (req, res) => {
 
 index.post('/login', (req, res) => {
     const {email, password} = req.body;
+    const innerPass = jwtDecode(password).password;
 
-    User.findOne({ email, password})
+    User.findOne({email})
         .exec()
         .then( response => {
-            if(response){
+            if(response && jwtDecode(response.password).password === innerPass){
+                const { id, name, surname, email, birthday, phone, role} = response;
                 const token = randtoken(16);
 
-                tokens.push({"token": token, "id": response.id});
+                tokens.push({"token": token, id});
                 tokens =_.uniqBy(tokens, 'id');
 
-                res.status(200).json({response, token})
+                res.status(200).json({response: {id,  name, surname, email, birthday, phone, role}, token})
             }else {
                 res.status(403).json("user not found")
             }
@@ -220,18 +231,6 @@ index.delete('/article', (req, res) => {
         .exec()
         .then( () => res.status(200).json({id}))
         .catch((err) => res.status(404).json(err));
-});
-
-index.get('/update_images', (req, res) => {
-    Image.find()
-        .exec()
-        .then((response) => {
-            response.map(({name, img}) => {
-                fs.writeFile(`images/${name}`, img, function(err){});
-            })
-        })
-        .then(() => res.status(500).json("ok"))
-        .catch(err => res.status(500).json(err))
 });
 
 index.get('/update_news', (req, res) => {
