@@ -179,21 +179,33 @@ index.post('/login', (req, res) => {
 });
 
 index.get('/session',(req, res) => {
-    if (tokens.length===0){
-        res.status(403)
+    if (tokens.length === 0 && req.query.token){
+        res.json({
+            error: true,
+            status:"Failed",
+            message:"Session not founds"
+        })
     } else {
         const id = tokens.find(item => item.token === req.query.token).id;
 
-        User.findOne({id})
-            .exec()
-            .then( response => {
-                if (response){
-                    res.status(200).json(response)
-                }else {
-                    res.status(403)
-                }
+        if(id){
+            User.findOne({id})
+                .exec()
+                .then( response => {
+                    if (response){
+                        res.status(200).json(response)
+                    }else {
+                        res.status(403)
+                    }
+                })
+                .catch(err => res.status(401).json(err));
+        }else {
+            res.json({
+                error: true,
+                status:"Failed",
+                message:"Session not founds"
             })
-            .catch(err => res.status(401).json(err));
+        }
     }
 });
 
@@ -235,14 +247,13 @@ index.delete('/article', (req, res) => {
 
 index.get('/update_news', (req, res) => {
     News.find({custom: false})
+        .distinct('id')
         .exec()
-        .then( response => {
-            let idsArr = [];
-            response.forEach(({id}) => idsArr.push(id));
-
-            News.deleteMany({id: { $in: idsArr}});
+        .then(response => {
+            return News.deleteMany({id: {$in: response}})
+                .then(res => res.deletedCount)
         })
-        .then(() => {
+        .then((response) => {
             clusters.map((countryCode) =>{
                 return axios.get(`${NEWS_API}/${countryCode === "global" ? global_url : `${source}${countryCode}`}&apiKey=${KEY}`)
                     .then(response => {
@@ -263,15 +274,29 @@ index.get('/update_news', (req, res) => {
                                 custom: false,
                                 id: new mongoose.Types.ObjectId()
                             });
-
                             article.save().catch(() => {return null});
                         });
                     })
                     .catch(() => {return null});
+            });
+            return response;
+        })
+        .then((response) => {
+            res.status(200).json({
+                text: "Updated",
+                status: "Success",
+                info: {
+                    deletedCounts: response,
+                }
             })
         })
-        .then(() => res.status(200).json("ok"))
-        .catch(err => res.status(500).json(err));
+        .catch(err => {
+            res.status(200).json({
+                text: "Not updated",
+                status: "Failed",
+                info: err
+            })
+        });
 });
 
 
