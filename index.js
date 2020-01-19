@@ -39,7 +39,10 @@ index.use('/images', express.static(path.join(__dirname, 'images')));
 mongoose.connect( uri, { useNewUrlParser: true, useUnifiedTopology: true, useCreateIndex: true });
 
 //rewrite all available images in mongo cloud after reload api
-Image.find().exec().then((response) => response.map(({name, img}) => fs.writeFile(`images/${name}`, img, function (err) {})));
+Image
+    .find()
+    .exec()
+    .then(res => res.map(({name, img}) => fs.writeFile(`images/${name}`, img, function (err) {})));
 
 index.get('/', (req, res) => {
     res.send("Hello, it's a news-api")
@@ -136,22 +139,17 @@ index.post('/article', (req, res) => {
 });
 
 index.put('/article', (req, res) => {
-    const editArticle = {...req.body};
+    const editArticle = req.body;
     const id = JSON.parse(JSON.stringify(req.query.id));
 
-    if (editArticle.main_image){
-        editArticle.urlToImage = editArticle.main_image
+    if (req.files && req.files.main_image) {
+        const imageFile = req.files.main_image;
+
+        editArticle.urlToImage = `${req.protocol}://${req.headers.host}/images/${imageFile.name}`;
+        imageFile.mv(`${__dirname}/images/${imageFile.name}`);
     }
 
     News.updateOne({id}, {$set: {...editArticle}})
-        .then(() => {
-            if (req.files && req.files.main_image) {
-                const imageFile = req.files.main_image;
-
-                editArticle.urlToImage = `${req.protocol}://${req.headers.host}/images/${imageFile.name}`;
-                imageFile.mv(`${__dirname}/images/${imageFile.name}`);
-            }
-        })
         .then(() => res.status(200).json({id, ...editArticle}))
         .catch(err => res.status(500).json(err));
 });
@@ -168,7 +166,7 @@ index.post('/login', (req, res) => {
                 const token = randtoken(16);
 
                 tokens.push({"token": token, id});
-                tokens =_.uniqBy(tokens, 'id');
+                tokens = _.uniqBy(tokens, 'id');
 
                 res.status(200).json({response: {id,  name, surname, email, birthday, phone, role}, token})
             }else {
