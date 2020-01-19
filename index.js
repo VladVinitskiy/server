@@ -44,9 +44,7 @@ Image
     .exec()
     .then(res => res.map(({name, img}) => fs.writeFile(`images/${name}`, img, function (err) {})));
 
-index.get('/', (req, res) => {
-    res.send("Hello, it's a news-api")
-});
+index.get('/', (req, res) => res.send("Hello, it's a news-api"));
 
 index.get('/news', (req, res) => {
     const cluster = JSON.parse(JSON.stringify(req.query.source));
@@ -57,15 +55,69 @@ index.get('/news', (req, res) => {
         .catch(err => res.status(500).json(err));
 });
 
+index.route('/article')
+    .post((req, res) => {
+        const {author, title, description, source, publishedAt} = req.body;
+        const cluster = JSON.parse(JSON.stringify(req.query.source ? req.query.source : "global"));
+        const imageFile = req.files && req.files.main_image;
+
+        const article = new News({
+            author, title,
+            description, source,
+            url: null,
+            urlToImage: null,
+            publishedAt,
+            comments: [],
+            cluster: cluster,
+            custom: true,
+            id: new mongoose.Types.ObjectId()
+        });
+
+
+        if (imageFile) {
+            article.urlToImage = `${req.protocol}://${req.headers.host}/images/${imageFile.name}`;
+            imageFile.mv(`${__dirname}/images/${imageFile.name}`);
+
+            const new_img = new Image({
+                img: imageFile.data,
+                name: imageFile.name,
+                id: new mongoose.Types.ObjectId()
+            });
+
+            new_img.save();
+        }
+
+        article.save()
+            .then(response => res.status(200).json(response))
+            .catch(err => res.status(500).json(err));
+    })
+    .put((req, res) => {
+        const editArticle = req.body;
+        const id = JSON.parse(JSON.stringify(req.query.id));
+
+        if (req.files && req.files.main_image) {
+            const imageFile = req.files.main_image;
+
+            editArticle.urlToImage = `${req.protocol}://${req.headers.host}/images/${imageFile.name}`;
+            imageFile.mv(`${__dirname}/images/${imageFile.name}`);
+        }
+
+        News.updateOne({id}, {$set: {...editArticle}})
+            .then(() => res.status(200).json({id, ...editArticle}))
+            .catch(err => res.status(500).json(err));
+    })
+    .delete((req, res) => {
+        const {id, type} = req.query;
+        let cluster = JSON.parse(JSON.stringify(type));
+
+        News.deleteOne({id, cluster: cluster})
+            .exec()
+            .then(() => res.status(200).json({id}))
+            .catch((err) => res.status(404).json(err));
+    });
+
 index.get('/users', (req, res) => {
     User.find()
-        .exec()
-        .then( response => res.status(200).json(response))
-        .catch(err => res.status(404).json(err));
-});
-
-index.get('/statistics', (req, res) => {
-    Statistics.find()
         .exec()
         .then( response => res.status(200).json(response))
         .catch(err => res.status(404).json(err));
@@ -84,75 +136,22 @@ index.post('/user', (req, res) => {
         .catch(err => res.status(404).json(err));
 });
 
-index.post('/statistics', (req, res) => {
-    const ip = jwtDecode(req.query.token).token;
-    const geo = geoip.lookup(ip);
-    const {country, city, timezone, ll, range} = geo;
-    const data = {
-        ip, country, city, timezone, ll, range,
-        visitedAt: req.body.date
-    };
-    const stats = new Statistics({
-        ...data,
-        id: new mongoose.Types.ObjectId()
-    });
-
-    stats.save()
-        .then(response => res.status(200).json(response))
+index.put('/user/:id', (req, res) => {
+    const {id} = req.params;
+    User.updateOne({id}, {$set: req.body})
+        .then(response => {
+            if(response){
+                User.findOne({id})
+                    .exec()
+                    .then( response => res.status(200).json(response))
+                    .catch(() => res.status(404).json("user doesn't exist"));
+            }else {
+                res.status(404).json("user doesn't exist")
+            }
+        })
         .catch(err => res.status(404).json(err));
 });
 
-index.post('/article', (req, res) => {
-    const {author, title, description, source, publishedAt} = req.body;
-    const cluster = JSON.parse(JSON.stringify(req.query.source ? req.query.source : "global"));
-    const imageFile = req.files && req.files.main_image;
-
-    const article = new News({
-        author, title,
-        description, source,
-        url: null,
-        urlToImage: null,
-        publishedAt,
-        comments: [],
-        cluster: cluster,
-        custom: true,
-        id: new mongoose.Types.ObjectId()
-    });
-
-
-    if(imageFile){
-        article.urlToImage = `${req.protocol}://${req.headers.host}/images/${imageFile.name}`;
-        imageFile.mv(`${__dirname}/images/${imageFile.name}`);
-
-        const new_img = new Image({
-            img: imageFile.data,
-            name: imageFile.name,
-            id: new mongoose.Types.ObjectId()
-        });
-
-        new_img.save();
-    }
-
-    article.save()
-        .then( response => res.status(200).json(response))
-        .catch(err => res.status(500).json(err));
-});
-
-index.put('/article', (req, res) => {
-    const editArticle = req.body;
-    const id = JSON.parse(JSON.stringify(req.query.id));
-
-    if (req.files && req.files.main_image) {
-        const imageFile = req.files.main_image;
-
-        editArticle.urlToImage = `${req.protocol}://${req.headers.host}/images/${imageFile.name}`;
-        imageFile.mv(`${__dirname}/images/${imageFile.name}`);
-    }
-
-    News.updateOne({id}, {$set: {...editArticle}})
-        .then(() => res.status(200).json({id, ...editArticle}))
-        .catch(err => res.status(500).json(err));
-});
 
 index.post('/login', (req, res) => {
     const {email, password} = req.body;
@@ -216,32 +215,30 @@ index.get('/logout',(req, res) => {
     }
 });
 
-index.put('/user/:id', (req, res) => {
-    const {id} = req.params;
-    User.updateOne({id}, {$set: req.body})
-        .then(response => {
-            if(response){
-                User.findOne({id})
-                    .exec()
-                    .then( response => res.status(200).json(response))
-                    .catch(() => res.status(404).json("user doesn't exist"));
-            }else {
-                res.status(404).json("user doesn't exist")
-            }
-        })
-        .catch(err => res.status(404).json(err));
-});
+index.route('/statistics')
+    .get((req, res) => {
+        Statistics.find()
+            .exec()
+            .then(response => res.status(200).json(response))
+            .catch(err => res.status(404).json(err));
+    })
+    .post((req, res) => {
+        const ip = jwtDecode(req.query.token).token;
+        const geo = geoip.lookup(ip);
+        const {country, city, timezone, ll, range} = geo;
+        const data = {
+            ip, country, city, timezone, ll, range,
+            visitedAt: req.body.date
+        };
+        const stats = new Statistics({
+            ...data,
+            id: new mongoose.Types.ObjectId()
+        });
 
-
-index.delete('/article', (req, res) => {
-    const {id, type} = req.query;
-    let cluster = JSON.parse(JSON.stringify(type));
-
-    News.deleteOne({id, cluster: cluster})
-        .exec()
-        .then( () => res.status(200).json({id}))
-        .catch((err) => res.status(404).json(err));
-});
+        stats.save()
+            .then(response => res.status(200).json(response))
+            .catch(err => res.status(404).json(err));
+    });
 
 index.get('/update_news', (req, res) => {
     News.find({custom: false})
