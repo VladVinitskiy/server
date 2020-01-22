@@ -34,7 +34,7 @@ index.use(bodyPareser.json());
 index.use(bodyPareser.urlencoded({extended: true}));
 index.use(cors());
 index.use(fileUpload());
-index.use('/images', express.static(path.join(__dirname, 'images')));
+index.use('/', express.static(path.join(__dirname)));
 
 mongoose.connect( uri, { useNewUrlParser: true, useUnifiedTopology: true, useCreateIndex: true });
 
@@ -325,5 +325,8 @@ io.on('connection', function(socket){
 
     // socket.on('disconnect', () =>{});
 });
+
+index.use((req, res) => res.status(404).sendFile(path.join(__dirname, "404", '404.html')));
+index.use((req, res) => res.status(500).sendFile(path.join(__dirname, "500", '500.html')));
 
 server.listen(port, () => console.log(`listening on port ${port}`));
