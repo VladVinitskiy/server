@@ -44,7 +44,21 @@ Image
     .exec()
     .then(res => res.map(({name, img}) => fs.writeFile(`images/${name}`, img, function (err) {})));
 
-index.get('/', (req, res) => res.send("Hello, it's a news-api"));
+if (fs.existsSync(path.join(__dirname, 'index.html'))){
+    index.get(
+        ['/', '/dashboard', '/login', '/signup', '/profile', '/admin', "/admin/users", "/admin/statistics"],
+        (req, res) => res.sendFile(path.join(__dirname, 'index.html'))
+    );
+} else {
+    index.get('/', (req, res) => {
+        const availableRoutes = !_.isEmpty(index._router.stack)
+            ? "<br> Available routes: <br>" + index._router.stack
+                .filter(r => r.route)
+                .map(r => r.route.path).join("<br>")
+            : "";
+        res.send(`Hello, it's a news-api ${availableRoutes}`)
+    });
+}
 
 index.get('/news', (req, res) => {
     const cluster = JSON.parse(JSON.stringify(req.query.source));

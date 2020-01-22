@@ -24,7 +24,16 @@
     "socket.io": "^2.2.0"
   },
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+
+    "win_replace_client": "move client\\build\\* && move client\\build\\icons && move client\\build\\static\n",
+    "lin_replace_client": "mv ./client/build/* ./",
+    "lin_remove_nm": "rm -rf node_modules",
+    "clone_client": "git clone https://github.com/kalitsinskiy/News.git client",
+    "preheroku": "npm run clone_client && cd client/ && npm install && npm run heroku_build",
+    "heroku": "npm run lin_replace_client && node index.js",
+    "prelocal_relize": "npm install && npm run clone_client && cd client/ && npm install && npm run develop_build",
+    "local_relize": "npm run win_replace_client && node index.js"
   },
   "repository": {
     "type": "git",
