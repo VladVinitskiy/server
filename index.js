@@ -150,6 +150,14 @@ index.put('/article', (req, res) => {
 
                 editArticle.urlToImage = `${req.protocol}://${req.headers.host}/images/${imageFile.name}`;
                 imageFile.mv(`${__dirname}/images/${imageFile.name}`);
+
+                const new_img = new Image({
+                    img: imageFile.data,
+                    name: imageFile.name,
+                    id: new mongoose.Types.ObjectId()
+                });
+
+                new_img.save();
             }
         })
         .then(() => res.status(200).json({id, ...editArticle}))
